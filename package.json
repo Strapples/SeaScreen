@@ -1,0 +1,14 @@
+{
+  "name": "seascreen",
+  "version": "1.0.0",
+  "description": "A dynamic video screensaver application made for cruise ship nerds.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "Alin S",
+  "license": "GPL-3.0-only",
+  "devDependencies": {
+    "electron": "^33.3.1"
+  }
+}

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SeaScreen</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: black;
+    }
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <video id="videoPlayer" autoplay loop muted></video>
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      try {
+        const videoPlayer = document.getElementById("videoPlayer");
+
+        // Request video files from the main process
+        const videoFiles = await window.electronAPI.invoke("get-video-files");
+
+        console.log("Available video files:", videoFiles);
+
+        if (videoFiles.length > 0) {
+          const randomVideo = videoFiles[Math.floor(Math.random() * videoFiles.length)];
+          console.log(`Now playing: videos/${randomVideo}`);
+
+          // Set video source and play
+          videoPlayer.src = `videos/Night/${randomVideo}`;
+          videoPlayer.load();
+
+          videoPlayer.oncanplay = () => {
+            console.log("Video is ready to play!");
+            videoPlayer.play();
+          };
+
+          videoPlayer.onerror = () => {
+            console.error("Error playing video:", videoPlayer.error);
+          };
+
+          // Handle video loop
+          videoPlayer.onended = () => {
+            const nextRandomVideo = videoFiles[Math.floor(Math.random() * videoFiles.length)];
+            console.log(`Next video: videos/Night/${nextRandomVideo}`);
+            videoPlayer.src = `videos/Night/${nextRandomVideo}`;
+            videoPlayer.load();
+            videoPlayer.play();
+          };
+        } else {
+          console.error("No video files found in the folder.");
+        }
+
+        // Exit screensaver on user activity
+        setTimeout(() => {
+          console.log("User input detection enabled.");
+          enableExitOnActivity();
+        }, 3000); // Grace period before detecting input
+      } catch (err) {
+        console.error("Error loading video files:", err);
+      }
+    });
+
+    function enableExitOnActivity() {
+      document.addEventListener("mousemove", exitScreensaver);
+      document.addEventListener("mousedown", exitScreensaver);
+      document.addEventListener("keydown", exitScreensaver);
+      document.addEventListener("wheel", exitScreensaver);
+    }
+
+    function exitScreensaver() {
+      console.log("User activity detected. Exiting screensaver...");
+      window.electronAPI.send("exit-screensaver");
+    }
+  </script>
+</body>
+</html>
