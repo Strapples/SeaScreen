@@ -8,6 +8,7 @@
       padding: 0;
       overflow: hidden;
       background: black;
+      cursor: none; /* Hides the cursor */
     }
     video {
       position: absolute;
@@ -20,7 +21,7 @@
   </style>
 </head>
 <body>
-  <video id="videoPlayer" autoplay loop muted></video>
+  <video id="videoPlayer" autoplay muted></video>
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
       try {
@@ -32,29 +33,29 @@
         console.log("Available video files:", videoFiles);
 
         if (videoFiles.length > 0) {
-          const randomVideo = videoFiles[Math.floor(Math.random() * videoFiles.length)];
-          console.log(`Now playing: videos/${randomVideo}`);
-
-          // Set video source and play
-          videoPlayer.src = randomVideo; // Use full path
-          videoPlayer.load();
-
-          videoPlayer.oncanplay = () => {
-            console.log("Video is ready to play!");
-            videoPlayer.play();
-          };
-
-          videoPlayer.onerror = () => {
-            console.error("Error playing video:", videoPlayer.error);
-          };
-
-          // Handle video loop
-          videoPlayer.onended = () => {
-            const nextRandomVideo = videoFiles[Math.floor(Math.random() * videoFiles.length)];
-            console.log(`Next video: videos/Night/${nextRandomVideo}`);
-            videoPlayer.src = `videos/Night/${nextRandomVideo}`;
+          // Function to play a random video
+          function playRandomVideo() {
+            const randomVideo = videoFiles[Math.floor(Math.random() * videoFiles.length)];
+            console.log(`Now playing: ${randomVideo}`);
+            videoPlayer.src = `file://${randomVideo}`; // Use absolute path
             videoPlayer.load();
             videoPlayer.play();
+          }
+
+          // Play a random video initially
+          playRandomVideo();
+
+          // Event listener for when the video ends
+          videoPlayer.onended = () => {
+            console.log("Video ended. Playing next random video...");
+            playRandomVideo();
+          };
+
+          // Error handling
+          videoPlayer.onerror = () => {
+            console.error("Error playing video:", videoPlayer.error);
+            console.log("Retrying with a new video...");
+            playRandomVideo();
           };
         } else {
           console.error("No video files found in the folder.");
