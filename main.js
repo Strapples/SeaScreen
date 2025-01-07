@@ -41,15 +41,14 @@ ipcMain.handle("get-video-files", async () => {
   const folder = getFolderByTime();
   const videoDir = path.join(__dirname, "videos", folder);
 
-  console.log("Selected folder:", videoDir);
-
   try {
-    const files = fs.readdirSync(videoDir).filter(file => {
-      return file.endsWith(".mp4") || file.endsWith(".mov") || file.endsWith(".mkv");
-    });
-
+    // Read video files from the selected directory
+    const files = fs.readdirSync(videoDir).filter(file => file.endsWith(".mp4") || file.endsWith(".mov") || file.endsWith(".mkv"));
+    console.log("Selected folder:", videoDir);
     console.log("Files in selected folder:", files);
-    return files;
+
+    // Convert to absolute paths for the renderer process
+    return files.map(file => path.join(videoDir, file));
   } catch (err) {
     console.error("Error reading video directory:", err);
     return [];

@@ -36,7 +36,7 @@
           console.log(`Now playing: videos/${randomVideo}`);
 
           // Set video source and play
-          videoPlayer.src = `videos/Night/${randomVideo}`;
+          videoPlayer.src = randomVideo; // Use full path
           videoPlayer.load();
 
           videoPlayer.oncanplay = () => {
