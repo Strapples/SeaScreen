@@ -35,9 +35,19 @@
         if (videoFiles.length > 0) {
           // Function to play a random video
           function playRandomVideo() {
-            const randomVideo = videoFiles[Math.floor(Math.random() * videoFiles.length)];
-            console.log(`Now playing: ${randomVideo}`);
-            videoPlayer.src = `file://${randomVideo}`; // Use absolute path
+            if (videoFiles.length === 1) {
+              console.log("Only one video available. Looping the same video.");
+              videoPlayer.src = `file://${videoFiles[0]}`;
+            } else {
+              let randomIndex;
+              do {
+                randomIndex = Math.floor(Math.random() * videoFiles.length);
+              } while (videoPlayer.src.includes(videoFiles[randomIndex]));
+
+              const randomVideo = videoFiles[randomIndex];
+              console.log(`Now playing: ${randomVideo}`);
+              videoPlayer.src = `file://${randomVideo}`; // Use absolute path
+            }
             videoPlayer.load();
             videoPlayer.play();
           }
