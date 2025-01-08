@@ -32,8 +32,8 @@ function getFolderByTime() {
   const currentHour = new Date().getHours();
   if (currentHour >= 5 && currentHour < 9) return "Sunrise";
   if (currentHour >= 9 && currentHour < 17) return "MidDay";
-  if (currentHour >= 17 && currentHour < 20) return "Sunset";
-  return "Night";
+  if (currentHour >= 17 && currentHour < 19) return "Sunset";
+  return "Night"; // Default to "Night" for hours 19-4
 }
 
 // Handle request for video files
