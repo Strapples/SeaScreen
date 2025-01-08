@@ -15,8 +15,7 @@ Current State
 	•	No UI.
 	•	No auto-launch logic.
 	•	Manual start required.
-	•	Unsigned app (Must bypass gatekeeper by control option clicking the app and telling it to run then accepting the unsigned warning.)
-
+	•	Unsigned app (Must bypass gatekeeper. Open it, get warned, then go to System Settings -> Privacy and Security -> find SeaScreen and click Open Anyway) (It's scanned by the host for viruses daily)
 
 Binary Releases https://sterlingmediaproductions.com/Software/
 
