@@ -10,10 +10,13 @@ Current State
 	•	Time-aware video selection works.
 	•	Cursor hides.
 	•	Screensaver exits on activity.
+	•	Easy to install (at least on mac, just open DMG, put in applications, then run it)
 	•	Missing Features: ❌
 	•	No UI.
 	•	No auto-launch logic.
 	•	Manual start required.
+	•	Unsigned app (Must bypass gatekeeper by control option clicking the app and telling it to run then accepting the unsigned warning.)
+
 
 Binary Releases https://sterlingmediaproductions.com/Software/
 
