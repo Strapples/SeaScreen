@@ -18,6 +18,9 @@ app.on("ready", () => {
     },
   });
 
+
+  // Electron is ready, tell it to ignore anything below E3 code 
+  app.commandLine.appendSwitch("log-level", "3"); // Suppresses FFmpeg encoder spam
   // Load the HTML file
   mainWindow.loadFile("index.html");
 
