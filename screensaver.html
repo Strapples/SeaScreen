@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SeaScreen Screensaver</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: black;
+      cursor: none; /* Hide cursor */
+    }
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <video id="videoPlayer" autoplay muted></video>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const videoPlayer = document.getElementById("videoPlayer");
+      let videoQueue = [];
+      let playedVideos = [];
+
+      try {
+        console.log("✅ screensaver.html loaded. Requesting video files...");
+        const videoFiles = await window.electronAPI.invoke("get-video-files");
+        console.log("🎥 Video files retrieved:", videoFiles);
+
+        if (videoFiles.length === 0) {
+          console.error("❌ No videos found.");
+          return;
+        }
+
+        const shuffleVideos = () => {
+          const remainingVideos = videoFiles.filter(file => !playedVideos.includes(file));
+          if (remainingVideos.length === 0) {
+            playedVideos = [];
+            console.log("🔄 Resetting video list. All videos played.");
+          }
+          videoQueue = remainingVideos.sort(() => Math.random() - 0.5);
+        };
+
+        const playNextVideo = () => {
+          if (videoQueue.length === 0) {
+            shuffleVideos();
+          }
+
+          const nextVideo = videoQueue.shift();
+          playedVideos.push(nextVideo);
+          if (playedVideos.length > 4) {
+            playedVideos.shift();
+          }
+
+          console.log(`▶️ Attempting to play: ${nextVideo}`);
+          videoPlayer.src = `file://${nextVideo}`;
+          videoPlayer.load();
+
+          // Ensure the video fully loads before playing
+          videoPlayer.onloadeddata = () => {
+  console.log("✅ First video loaded, attempting to play...");
+  videoPlayer.play().then(() => {
+    console.log("🎬 First video playing successfully, now showing window...");
+    window.electronAPI.send("show-screensaver");
+  }).catch(err => {
+    console.error("⚠️ Error playing video:", err);
+    playNextVideo(); // Skip to next video if this one fails
+  });
+};
+
+          videoPlayer.onerror = () => {
+            console.error("❌ Video playback error, skipping...");
+            playNextVideo();
+          };
+        };
+
+        videoPlayer.addEventListener("ended", () => {
+  console.log("🎬 Video ended, waiting before playing next...");
+  setTimeout(() => {
+    playNextVideo();
+  }, 500); // Add a short delay before switching videos
+});
+
+        shuffleVideos();
+        playNextVideo();
+
+        // ✅ Ensure exit detection works
+        const exitScreensaver = (event) => {
+          console.log(`🔍 User activity detected: ${event.type}`);
+
+          if (!window.electronAPI) {
+            console.error("❌ ERROR: window.electronAPI is undefined! Preload may not be loading.");
+            return;
+          }
+
+          console.log("📤 Sending exit signal to main process...");
+          window.electronAPI.send("exit-screensaver", { reason: "User input detected" });
+        };
+
+        setTimeout(() => {
+  console.log("✅ Enabling user activity detection...");
+  ["mousemove", "mousedown", "keydown", "wheel", "touchstart", "touchmove", "keypress"].forEach(eventType => {
+    document.addEventListener(eventType, (event) => exitScreensaver(event, "User input detected"), { passive: true });
+  });
+}, 3000); // Wait 3 seconds before enabling exit detection
+
+        console.log("✅ Exit event listeners attached.");
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            console.log("⏹ Escape key pressed. Exiting screensaver...");
+            exitScreensaver(event);
+          }
+        });
+
+      } catch (err) {
+        console.error("❌ Error loading video files:", err);
+      }
+    });
+  </script>
+</body>
+</html>

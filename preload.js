@@ -1,7 +1,11 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
-// Expose ipcRenderer methods to the renderer process
+console.log("✅ preload.js loaded. Exposing API...");
+
 contextBridge.exposeInMainWorld("electronAPI", {
-  invoke: (channel, data) => ipcRenderer.invoke(channel, data), // Async calls
-  send: (channel, data) => ipcRenderer.send(channel, data),     // Fire-and-forget calls
+  send: (channel, data) => {
+    console.log(`📤 IPC SEND: ${channel}`, data);
+    ipcRenderer.send(channel, data);
+  },
+  invoke: (channel, data) => ipcRenderer.invoke(channel, data),
 });

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SeaScreen Screensaver</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: black;
+      cursor: none; /* Hide cursor */
+    }
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+  <video id="videoPlayer" autoplay muted></video>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const videoPlayer = document.getElementById("videoPlayer");
+      let videoQueue = [];
+      let playedVideos = [];
+
+      try {
+        const videoFiles = await window.electronAPI.invoke("get-video-files");
+        console.log("Video files retrieved:", videoFiles);
+
+        if (videoFiles.length > 0) {
+          const shuffleVideos = () => {
+            const remainingVideos = videoFiles.filter(file => !playedVideos.includes(file));
+            if (remainingVideos.length === 0) {
+              playedVideos = [];
+              console.log("Resetting video list. All videos played.");
+            }
+            videoQueue = remainingVideos.sort(() => Math.random() - 0.5);
+          };
+
+          const playNextVideo = () => {
+            if (videoQueue.length === 0) {
+              shuffleVideos();
+            }
+
+            const nextVideo = videoQueue.shift();
+            playedVideos.push(nextVideo);
+            if (playedVideos.length > 4) {
+              playedVideos.shift();
+            }
+
+            console.log(`Playing video: ${nextVideo}`);
+            videoPlayer.src = `file://${nextVideo}`;
+            videoPlayer.load();
+            videoPlayer.play();
+          };
+
+          videoPlayer.addEventListener("canplay", () => {
+            console.log("Video is ready to play.");
+          });
+
+          videoPlayer.addEventListener("ended", () => {
+            console.log("Video ended.");
+            playNextVideo();
+          });
+
+          videoPlayer.addEventListener("error", (e) => {
+            console.error("Video playback error:", e);
+            playNextVideo();
+          });
+
+          shuffleVideos();
+          playNextVideo();
+        } else {
+          console.error("No videos found.");
+        }
+
+        // Exit screensaver on user activity
+        const exitScreensaver = () => {
+          console.log("User activity detected. Exiting screensaver...");
+          window.electronAPI.send("exit-screensaver");
+        };
+
+        document.addEventListener("mousemove", exitScreensaver);
+        document.addEventListener("mousedown", exitScreensaver);
+        document.addEventListener("keydown", exitScreensaver);
+        document.addEventListener("wheel", exitScreensaver);
+      } catch (err) {
+        console.error("Error loading video files:", err);
+      }
+    });
+  </script>
+</body>
+</html>
