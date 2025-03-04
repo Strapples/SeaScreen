@@ -1,98 +1,69 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SeaScreen Screensaver</title>
+  <title>SeaScreen Settings</title>
   <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: black;
-      cursor: none; /* Hide cursor */
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #222;
+      color: white;
+      padding: 20px;
     }
-    video {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
+    #notice {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #ffcc00;
     }
   </style>
 </head>
 <body>
-  <video id="videoPlayer" autoplay muted></video>
+  <h1>SeaScreen Settings</h1>
+  
+  <label for="timeout">Inactivity Timeout (minutes):</label>
+  <input type="number" id="timeout" min="1" max="60">
+  
+  <br><br>
+  
+  <label for="kioskMode">Launch Instantly - Kiosk/Devs:</label>
+  <input type="checkbox" id="kioskMode">
+  
+  <br><br>
+  
+  <button id="saveButton">Save</button>
+  <p id="notice">Close this window to reactivate the screensaver.</p>
 
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
-      const videoPlayer = document.getElementById("videoPlayer");
-      let videoQueue = [];
-      let playedVideos = [];
-
       try {
-        const videoFiles = await window.electronAPI.invoke("get-video-files");
-        console.log("Video files retrieved:", videoFiles);
+        console.log("⚙️ Loading settings...");
+        const settings = await window.electronAPI.invoke("load-settings");
+        console.log("✅ Settings loaded:", settings);
 
-        if (videoFiles.length > 0) {
-          const shuffleVideos = () => {
-            const remainingVideos = videoFiles.filter(file => !playedVideos.includes(file));
-            if (remainingVideos.length === 0) {
-              playedVideos = [];
-              console.log("Resetting video list. All videos played.");
-            }
-            videoQueue = remainingVideos.sort(() => Math.random() - 0.5);
-          };
-
-          const playNextVideo = () => {
-            if (videoQueue.length === 0) {
-              shuffleVideos();
-            }
-
-            const nextVideo = videoQueue.shift();
-            playedVideos.push(nextVideo);
-            if (playedVideos.length > 4) {
-              playedVideos.shift();
-            }
-
-            console.log(`Playing video: ${nextVideo}`);
-            videoPlayer.src = `file://${nextVideo}`;
-            videoPlayer.load();
-            videoPlayer.play();
-          };
-
-          videoPlayer.addEventListener("canplay", () => {
-            console.log("Video is ready to play.");
-          });
-
-          videoPlayer.addEventListener("ended", () => {
-            console.log("Video ended.");
-            playNextVideo();
-          });
-
-          videoPlayer.addEventListener("error", (e) => {
-            console.error("Video playback error:", e);
-            playNextVideo();
-          });
-
-          shuffleVideos();
-          playNextVideo();
-        } else {
-          console.error("No videos found.");
+        if (settings) {
+          document.getElementById("timeout").value = settings.inactivityTimeout / 60000;
+          document.getElementById("kioskMode").checked = settings.kioskMode || true;
         }
-
-        // Exit screensaver on user activity
-        const exitScreensaver = () => {
-          console.log("User activity detected. Exiting screensaver...");
-          window.electronAPI.send("exit-screensaver");
-        };
-
-        document.addEventListener("mousemove", exitScreensaver);
-        document.addEventListener("mousedown", exitScreensaver);
-        document.addEventListener("keydown", exitScreensaver);
-        document.addEventListener("wheel", exitScreensaver);
-      } catch (err) {
-        console.error("Error loading video files:", err);
+      } catch (error) {
+        console.error("❌ Error loading settings:", error);
       }
+    });
+
+    document.getElementById("saveButton").addEventListener("click", () => {
+      const timeout = document.getElementById("timeout").value * 60000;
+      const kioskMode = document.getElementById("kioskMode").checked;
+
+      console.log("💾 Saving settings:", { inactivityTimeout: timeout, kioskMode });
+      window.electronAPI.send("save-settings", { inactivityTimeout: timeout, kioskMode });
+
+      // Notify main process to apply settings immediately
+      window.electronAPI.send("apply-settings", { inactivityTimeout: timeout, kioskMode });
+    });
+
+    // ✅ Prevent black screen issue after settings close
+    window.addEventListener("beforeunload", () => {
+      console.log("⚙️ Settings window closed.");
+      window.electronAPI.send("settings-closed");
     });
   </script>
 </body>

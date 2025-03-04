@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-≈z<html>
+<html>
 <head>
   <title>SeaScreen Screensaver</title>
   <style>
@@ -28,6 +28,8 @@
       const videoPlayer = document.getElementById("videoPlayer");
       let videoQueue = [];
       let playedVideos = [];
+      let settingsOpen = false;
+      let exitAllowed = false;
 
       try {
         console.log("✅ screensaver.html loaded. Requesting video files...");
@@ -40,84 +42,73 @@
         }
 
         const shuffleVideos = () => {
-          const remainingVideos = videoFiles.filter(file => !playedVideos.includes(file));
+          let remainingVideos = videoFiles.filter(file => !playedVideos.includes(file));
           if (remainingVideos.length === 0) {
             playedVideos = [];
-            console.log("🔄 Resetting video list. All videos played.");
+            remainingVideos = [...videoFiles];
           }
           videoQueue = remainingVideos.sort(() => Math.random() - 0.5);
         };
 
         const playNextVideo = () => {
-          if (videoQueue.length === 0) {
-            shuffleVideos();
-          }
-
+          if (videoQueue.length === 0) shuffleVideos();
           const nextVideo = videoQueue.shift();
           playedVideos.push(nextVideo);
-          if (playedVideos.length > 4) {
-            playedVideos.shift();
-          }
-
-          console.log(`▶️ Attempting to play: ${nextVideo}`);
+          if (playedVideos.length > 4) playedVideos.shift();
+          console.log(`▶️ Playing: ${nextVideo}`);
           videoPlayer.src = `file://${nextVideo}`;
           videoPlayer.load();
 
-          // Ensure the video fully loads before playing
-          videoPlayer.onloadeddata = () => {
-  console.log("✅ First video loaded, attempting to play...");
-  videoPlayer.play().then(() => {
-    console.log("🎬 First video playing successfully, now showing window...");
-    window.electronAPI.send("show-screensaver");
-  }).catch(err => {
-    console.error("⚠️ Error playing video:", err);
-    playNextVideo(); // Skip to next video if this one fails
-  });
-};
-
-          videoPlayer.onerror = () => {
-            console.error("❌ Video playback error, skipping...");
-            playNextVideo();
+          videoPlayer.oncanplay = () => {
+            setTimeout(() => {
+              console.log("✅ Video loaded, playing...");
+              videoPlayer.play().catch(err => console.error("⚠️ Playback error:", err));
+            }, 500);
           };
         };
 
-        videoPlayer.addEventListener("ended", () => {
-  console.log("🎬 Video ended, waiting before playing next...");
-  setTimeout(() => {
-    playNextVideo();
-  }, 500); // Add a short delay before switching videos
-});
+        videoPlayer.addEventListener("ended", playNextVideo);
+        videoPlayer.addEventListener("error", () => {
+          console.error("❌ Video playback error, skipping...");
+          playNextVideo();
+        });
 
         shuffleVideos();
         playNextVideo();
 
-        // ✅ Ensure exit detection works
-        const exitScreensaver = (event) => {
-          console.log(`🔍 User activity detected: ${event.type}`);
-
-          if (!window.electronAPI) {
-            console.error("❌ ERROR: window.electronAPI is undefined! Preload may not be loading.");
-            return;
-          }
-
-          console.log("📤 Sending exit signal to main process...");
-          window.electronAPI.send("exit-screensaver", { reason: "User input detected" });
+        // Enable exit logic **only after the video has started playing**
+        videoPlayer.onplay = () => {
+          console.log("🔓 Exit enabled after video playback starts.");
+          exitAllowed = true;
         };
 
-        setTimeout(() => {
-  console.log("✅ Enabling user activity detection...");
-  ["mousemove", "mousedown", "keydown", "wheel", "touchstart", "touchmove", "keypress"].forEach(eventType => {
-    document.addEventListener(eventType, (event) => exitScreensaver(event, "User input detected"), { passive: true });
-  });
-}, 3000); // Wait 3 seconds before enabling exit detection
-
-        console.log("✅ Exit event listeners attached.");
-
-        document.addEventListener("keydown", (event) => {
-          if (event.key === "Escape") {
-            console.log("⏹ Escape key pressed. Exiting screensaver...");
-            exitScreensaver(event);
+        const exitScreensaver = (event) => {
+          if (!exitAllowed) {
+            console.log("🚫 Exit attempt blocked (video not started).");
+            return;
           }
+          if (settingsOpen) {
+            console.log("⚙️ Settings window open, ignoring exit event.");
+            return;
+          }
+          console.log(`🔍 Exit triggered by: ${event.type}`);
+          window.electronAPI.send("exit-screensaver");
+        };
+
+        // Attach exit listeners for user activity (but ignore if settings is open)
+        ["mousemove", "mousedown", "wheel", "keydown"].forEach(eventType => {
+          document.addEventListener(eventType, exitScreensaver, { passive: true });
+        });
+
+        // **Settings window handling**
+        window.electronAPI.on("settings-opened", () => {
+          console.log("⚙️ Settings window opened. Pausing exit detection.");
+          settingsOpen = true;
+        });
+
+        window.electronAPI.on("settings-closed", () => {
+          console.log("⚙️ Settings window closed. Resuming exit detection.");
+          setTimeout(() => { settingsOpen = false; }, 500);
         });
 
       } catch (err) {
