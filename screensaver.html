@@ -8,7 +8,7 @@
       padding: 0;
       overflow: hidden;
       background: black;
-      cursor: none; /* Hide cursor */
+      cursor: none;
     }
     video {
       position: absolute;
@@ -26,90 +26,34 @@
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
       const videoPlayer = document.getElementById("videoPlayer");
-      let videoQueue = [];
-      let playedVideos = [];
-      let settingsOpen = false;
-      let exitAllowed = false;
 
       try {
         console.log("✅ screensaver.html loaded. Requesting video files...");
         const videoFiles = await window.electronAPI.invoke("get-video-files");
         console.log("🎥 Video files retrieved:", videoFiles);
 
-        if (videoFiles.length === 0) {
+        if (!videoFiles || videoFiles.length === 0) {
           console.error("❌ No videos found.");
           return;
         }
 
-        const shuffleVideos = () => {
-          let remainingVideos = videoFiles.filter(file => !playedVideos.includes(file));
-          if (remainingVideos.length === 0) {
-            playedVideos = [];
-            remainingVideos = [...videoFiles];
-          }
-          videoQueue = remainingVideos.sort(() => Math.random() - 0.5);
-        };
-
+        let index = 0;
         const playNextVideo = () => {
-          if (videoQueue.length === 0) shuffleVideos();
-          const nextVideo = videoQueue.shift();
-          playedVideos.push(nextVideo);
-          if (playedVideos.length > 4) playedVideos.shift();
+          if (index >= videoFiles.length) index = 0;
+          const nextVideo = videoFiles[index++];
           console.log(`▶️ Playing: ${nextVideo}`);
+
           videoPlayer.src = `file://${nextVideo}`;
           videoPlayer.load();
 
           videoPlayer.oncanplay = () => {
-            setTimeout(() => {
-              console.log("✅ Video loaded, playing...");
-              videoPlayer.play().catch(err => console.error("⚠️ Playback error:", err));
-            }, 500);
+            videoPlayer.play().catch(err => console.error("⚠️ Playback error:", err));
           };
+
+          videoPlayer.addEventListener("ended", playNextVideo);
         };
 
-        videoPlayer.addEventListener("ended", playNextVideo);
-        videoPlayer.addEventListener("error", () => {
-          console.error("❌ Video playback error, skipping...");
-          playNextVideo();
-        });
-
-        shuffleVideos();
         playNextVideo();
-
-        // Enable exit logic **only after the video has started playing**
-        videoPlayer.onplay = () => {
-          console.log("🔓 Exit enabled after video playback starts.");
-          exitAllowed = true;
-        };
-
-        const exitScreensaver = (event) => {
-          if (!exitAllowed) {
-            console.log("🚫 Exit attempt blocked (video not started).");
-            return;
-          }
-          if (settingsOpen) {
-            console.log("⚙️ Settings window open, ignoring exit event.");
-            return;
-          }
-          console.log(`🔍 Exit triggered by: ${event.type}`);
-          window.electronAPI.send("exit-screensaver");
-        };
-
-        // Attach exit listeners for user activity (but ignore if settings is open)
-        ["mousemove", "mousedown", "wheel", "keydown"].forEach(eventType => {
-          document.addEventListener(eventType, exitScreensaver, { passive: true });
-        });
-
-        // **Settings window handling**
-        window.electronAPI.on("settings-opened", () => {
-          console.log("⚙️ Settings window opened. Pausing exit detection.");
-          settingsOpen = true;
-        });
-
-        window.electronAPI.on("settings-closed", () => {
-          console.log("⚙️ Settings window closed. Resuming exit detection.");
-          setTimeout(() => { settingsOpen = false; }, 500);
-        });
 
       } catch (err) {
         console.error("❌ Error loading video files:", err);

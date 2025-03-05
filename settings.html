@@ -20,18 +20,12 @@
 <body>
   <h1>SeaScreen Settings</h1>
   
-  <label for="timeout">Inactivity Timeout (minutes):</label>
-  <input type="number" id="timeout" min="1" max="60">
-  
-  <br><br>
-  
-  <label for="kioskMode">Launch Instantly - Kiosk/Devs:</label>
+  <label for="kioskMode">Launch Instantly (Kiosk Mode):</label>
   <input type="checkbox" id="kioskMode">
   
   <br><br>
   
-  <button id="saveButton">Save</button>
-  <p id="notice">Close this window to reactivate the screensaver.</p>
+  <button id="saveButton">Apply & Close</button>
 
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
@@ -41,8 +35,7 @@
         console.log("✅ Settings loaded:", settings);
 
         if (settings) {
-          document.getElementById("timeout").value = settings.inactivityTimeout / 60000;
-          document.getElementById("kioskMode").checked = settings.kioskMode || true;
+          document.getElementById("kioskMode").checked = settings.kioskMode || false;
         }
       } catch (error) {
         console.error("❌ Error loading settings:", error);
@@ -50,20 +43,10 @@
     });
 
     document.getElementById("saveButton").addEventListener("click", () => {
-      const timeout = document.getElementById("timeout").value * 60000;
       const kioskMode = document.getElementById("kioskMode").checked;
 
-      console.log("💾 Saving settings:", { inactivityTimeout: timeout, kioskMode });
-      window.electronAPI.send("save-settings", { inactivityTimeout: timeout, kioskMode });
-
-      // Notify main process to apply settings immediately
-      window.electronAPI.send("apply-settings", { inactivityTimeout: timeout, kioskMode });
-    });
-
-    // ✅ Prevent black screen issue after settings close
-    window.addEventListener("beforeunload", () => {
-      console.log("⚙️ Settings window closed.");
-      window.electronAPI.send("settings-closed");
+      console.log("💾 Saving settings:", { kioskMode });
+      window.electronAPI.send("apply-settings", { kioskMode });
     });
   </script>
 </body>

@@ -4,9 +4,7 @@ const fs = require("fs");
 
 let mainWindow;
 let settingsWindow;
-let inactivityTimeout;
 let kioskMode;
-let inactivityTimer;
 
 const settingsFile = path.join(app.getPath("userData"), "settings.json");
 
@@ -19,7 +17,7 @@ function loadSettings() {
   } catch (err) {
     console.error("❌ Error loading settings:", err);
   }
-  return { inactivityTimeout: 600000, kioskMode: false }; // Default 10 min timeout, kiosk mode off
+  return { kioskMode: false }; // Default settings
 }
 
 function saveSettings(newSettings) {
@@ -31,9 +29,18 @@ function saveSettings(newSettings) {
   }
 }
 
-// ✅ Ensure IPC handlers are registered BEFORE creating windows
+// ✅ Time-based video folder selection
+function getFolderByTime() {
+  const currentHour = new Date().getHours();
+  if (currentHour >= 5 && currentHour < 9) return "Sunrise";
+  if (currentHour >= 9 && currentHour < 17) return "MidDay";
+  if (currentHour >= 17 && currentHour < 19) return "Sunset";
+  return "Night"; // Default
+}
+
+// ✅ Get video files based on time
 ipcMain.handle("get-video-files", async () => {
-  console.log("📂 Handling video file request...");
+  console.log("📂 Fetching video files...");
   const folder = getFolderByTime();
   const videoDir = path.join(__dirname, "videos", folder);
 
@@ -47,6 +54,11 @@ ipcMain.handle("get-video-files", async () => {
       file.endsWith(".mp4") || file.endsWith(".mov") || file.endsWith(".mkv")
     );
 
+    if (files.length === 0) {
+      console.warn("⚠️ No video files found!");
+      return [];
+    }
+
     console.log("🎥 Files found:", files);
     return files.map(file => path.join(videoDir, file));
   } catch (err) {
@@ -55,30 +67,9 @@ ipcMain.handle("get-video-files", async () => {
   }
 });
 
-ipcMain.handle("load-settings", () => loadSettings());
-
-ipcMain.on("save-settings", (event, newSettings) => {
-  saveSettings(newSettings);
-  inactivityTimeout = newSettings.inactivityTimeout;
-  kioskMode = newSettings.kioskMode;
-  restartInactivityTimer();
-});
-
-// ✅ Function to determine time-based video folder
-function getFolderByTime() {
-  const currentHour = new Date().getHours();
-  if (currentHour >= 5 && currentHour < 9) return "Sunrise";
-  if (currentHour >= 9 && currentHour < 17) return "MidDay";
-  if (currentHour >= 17 && currentHour < 19) return "Sunset";
-  return "Night"; // Default to Night
-}
-
 // ✅ Create Screensaver Window
 function createMainWindow() {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    console.log("📺 Main window already exists.");
-    return;
-  }
+  if (mainWindow && !mainWindow.isDestroyed()) return;
 
   mainWindow = new BrowserWindow({
     width: 3840,
@@ -99,10 +90,7 @@ function createMainWindow() {
 
   mainWindow.webContents.once("did-finish-load", () => {
     console.log("✅ Screensaver loaded.");
-    if (kioskMode) {
-      console.log("🚀 Kiosk Mode enabled. Launching screensaver instantly.");
-      mainWindow.show();
-    }
+    setTimeout(() => mainWindow.show(), 1000); // Ensures the window appears
   });
 
   mainWindow.on("closed", () => {
@@ -111,12 +99,9 @@ function createMainWindow() {
   });
 }
 
-// ✅ Create Settings Window (WITH CLOSE BUTTON)
+// ✅ Fix: Close settings window when "Apply" is clicked
 function createSettingsWindow() {
-  if (settingsWindow) {
-    console.log("⚙️ Settings window already open.");
-    return;
-  }
+  if (settingsWindow) return;
 
   settingsWindow = new BrowserWindow({
     width: 800,
@@ -135,46 +120,36 @@ function createSettingsWindow() {
 
   settingsWindow.loadFile("settings.html");
 
-  settingsWindow.on("closed", () => {
-    console.log("⚙️ Settings window closed.");
-    settingsWindow = null;
+  ipcMain.once("apply-settings", (event, newSettings) => {
+    console.log("⚙️ Applying new settings:", newSettings);
+    saveSettings(newSettings);
+    kioskMode = newSettings.kioskMode;
+    settingsWindow.close(); // ✅ Close settings on Apply
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       console.log("🔄 Returning to screensaver...");
       mainWindow.show();
     }
   });
-}
 
-// ✅ Restart Inactivity Timer (Fixes Black Screen)
-function restartInactivityTimer() {
-  if (kioskMode) {
-    console.log("🚀 Kiosk Mode is active. Skipping inactivity timer.");
-    if (!mainWindow) createMainWindow();
-    mainWindow.show();
-    return;
-  }
-
-  if (inactivityTimer) clearTimeout(inactivityTimer);
-
-  inactivityTimer = setTimeout(() => {
-    console.log("⏳ Inactivity timeout reached. Starting screensaver...");
-    if (!mainWindow) createMainWindow();
-    mainWindow.show();
-  }, inactivityTimeout);
-}
-
-// ✅ Register Global Hotkeys
-function registerHotkeys() {
-  globalShortcut.register("Control+S+C", () => {
-    console.log("🔑 Hotkey Ctrl + S + C pressed.");
-    createSettingsWindow();
+  settingsWindow.on("closed", () => {
+    console.log("⚙️ Settings window closed.");
+    settingsWindow = null;
   });
+}
+
+// ✅ Register Hotkeys
+function registerHotkeys() {
+  const settingsShortcut = process.platform === "darwin" ? "Command+S+A" : "Control+S+A";
+  globalShortcut.register(settingsShortcut, createSettingsWindow);
 
   globalShortcut.register("Escape", () => {
     if (kioskMode) {
       console.log("🚀 Escape Key Pressed. Exiting Kiosk Mode...");
       app.quit();
+    } else {
+      console.log("✅ Escape Key Pressed. Hiding Screensaver...");
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
     }
   });
 }
@@ -183,36 +158,12 @@ function registerHotkeys() {
 app.whenReady().then(() => {
   console.log("🚀 Electron app ready.");
   const settings = loadSettings();
-  inactivityTimeout = settings.inactivityTimeout;
   kioskMode = settings.kioskMode;
   registerHotkeys();
-  restartInactivityTimer();
+  createMainWindow();
 });
 
-// ✅ Handle Screensaver Exit (ONLY Escape Key in Kiosk Mode)
-ipcMain.on("exit-screensaver", (event, data) => {
-  console.log(`🛑 Exit signal received. Reason: ${data?.reason || "Unknown source"}`);
-
-  if (kioskMode) {
-    if (data?.reason === "Escape Key") {
-      console.log("✅ Escape Key Pressed. Exiting Kiosk Mode...");
-      app.quit();
-    } else {
-      console.log("🚫 Kiosk Mode active. Ignoring exit attempt.");
-      return;
-    }
-  }
-
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    console.log("✅ Hiding screensaver...");
-    mainWindow.hide();
-    restartInactivityTimer();
-  } else {
-    console.error("⚠️ ERROR: Main window is already destroyed or null. Preventing crash.");
-  }
-});
-
-// ✅ Quit when all windows are closed (except macOS)
+// ✅ Quit when all windows are closed
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
